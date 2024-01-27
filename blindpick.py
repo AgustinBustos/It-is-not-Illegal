@@ -19,6 +19,7 @@ import re
 import yaml
 from datetime import datetime, timedelta
 from fill_form import *
+from selenium.webdriver.common.action_chains import ActionChains
 
 log = logging.getLogger(__name__)
 # driver = webdriver.Chrome(ChromeDriverManager().install())
@@ -26,6 +27,7 @@ options = uc.ChromeOptions()
 options.add_argument(r"--user-data-dir=C:\Users\TheQwertyPhoenix\AppData\Local\Google\Chrome\User Data") #e.g. C:\Users\You\AppData\Local\Google\Chrome\User Data
 options.add_argument(r'--profile-directory=Profile 1') #e.g. Profile 3
 driver=uc.Chrome(options=options)
+# driver = webdriver.Chrome(ChromeDriverManager().install())
 
 def setupLogger() -> None:
     dt: str = datetime.strftime(datetime.now(), "%m_%d_%y %H_%M_%S ")
@@ -43,11 +45,14 @@ def setupLogger() -> None:
     c_handler.setFormatter(c_format)
     log.addHandler(c_handler)
 
+#  Clicking the EASY apply button
+
+
 
 class EasyApplyBot:
     setupLogger()
     # MAX_SEARCH_TIME is 10 hours by default, feel free to modify it
-    MAX_SEARCH_TIME = 5 * 60 * 60   ###############################################OJO
+    MAX_SEARCH_TIME = 10 * 60 * 60   ###############################################OJO
 
     def __init__(self,
                  uploads={},
@@ -219,6 +224,7 @@ class EasyApplyBot:
                     self.get_job_page(jobID)
 
                     # get easy apply button
+                    # time.sleep(20)
                     button = self.get_easy_apply_button()
                     # word filter to skip positions not wanted
 
@@ -230,7 +236,18 @@ class EasyApplyBot:
                         else:
                             string_easy = "* has Easy Apply Button"
                             log.info("Clicking the EASY apply button")
-                            button.click()
+                            
+                            
+                            time.sleep(3)
+                            try:
+                              
+                                button.click()
+                                
+                            
+                            except Exception as e:
+                                print(e)
+                            print('clicked')
+                            
                             time.sleep(3)
                             # self.fill_out_phone_number()
                             result: bool = self.send_resume()
@@ -253,7 +270,7 @@ class EasyApplyBot:
                                 ****************************************\n\n""")
                         time.sleep(sleepTime)
 
-                    # go to new page if all jobs are done
+                    # go to new page if all jobs are done   complete_only_text
                     if count_job == len(jobIDs):
                         jobs_per_page = jobs_per_page + 25
                         count_job = 0
@@ -294,10 +311,10 @@ class EasyApplyBot:
     def get_easy_apply_button(self):
         try:
             button = self.browser.find_elements("xpath",
-                '//button[contains(@class, "jobs-apply-button")]'
+                '//button[contains(@class, "jobs-apply-button")]'    #    jobs-apply-button  Doesn't have Easy Apply Button jobs-apply-button artdeco-button artdeco-button--3 artdeco-button--primary ember-view
             )
-
-            EasyApplyButton = button[0]
+            # print(button)
+            EasyApplyButton = [i for i in button if i.is_displayed()][0] #button[0]  
             
         except Exception as e: 
             print("Exception:",e)
@@ -370,14 +387,19 @@ class EasyApplyBot:
             submit_application_locator = (By.CSS_SELECTOR,
                                           "button[aria-label='Submit application']")
             error_locator = (By.CSS_SELECTOR,
-                             "div[aria-invalid='true']")  #"p[data-test-form-element-error-message='true']" "li-icon[aria-hidden='true']"
+                             "div[role='alert']")  #"p[data-test-form-element-error-message='true']"  "div[aria-invalid='true']"    "li-icon[aria-hidden='true']"
             upload_locator = upload_locator = (By.CSS_SELECTOR, "button[aria-label='DOC, DOCX, PDF formats only (5 MB).']")
             follow_locator = (By.CSS_SELECTOR, "label[for='follow-company-checkbox']")
 
             submitted = False
             
+
+            how_many_tries=0
             while True:
                 print('SEND RESUME LOOP')
+                how_many_tries+=1
+                
+                # new_error=self.browser.find_elements(error_locator[0],error_locator[1])
 
                 # Upload Cover Letter if possible
                 if is_present(upload_locator):
@@ -402,14 +424,19 @@ class EasyApplyBot:
                 buttons: list = [next_locater, review_locater, follow_locator,
                            submit_locater, submit_application_locator]
                 
+                # print([is_present(i) for i in buttons])
+                print(is_present(error_locator))
                 already_error=False
+# complete_only_text
                 for i, button_locator in enumerate(buttons):
+                    print(i)
                     if is_present(button_locator):
                         button: None = self.wait.until(EC.element_to_be_clickable(button_locator))
 
                     if is_present(error_locator):
                         print('ENCONTRO EL ERROR?') 
                         if already_error:         ###################################
+                            print('esta es la razon que corta?')
                             button = None
                             break
                         already_error=True
@@ -418,10 +445,10 @@ class EasyApplyBot:
                         # print(self.browser.find_elements(error_locator[0],
                         #                                           error_locator[1]))
                            #############OJOTA
-                        complete_only_text(self.browser.find_elements(error_locator[0],error_locator[1]))
-                        # if not complete_only_text(self.browser.find_elements(error_locator[0],error_locator[1])):################
-                        #     button = None
-                        #     break
+                        # complete_only_text(self.browser.find_elements(error_locator[0],error_locator[1]))
+                        if complete_only_text(self.browser.find_elements(error_locator[0],error_locator[1]))==False:################
+                            button = None
+                            break
 
                         # for element in self.browser.find_elements(error_locator[0],
                         #                                           error_locator[1]):
@@ -442,16 +469,21 @@ class EasyApplyBot:
 
                     if button:
                         button.click()
+                        print('clickeo boton')
                         time.sleep(random.uniform(1.5, 2.5))
                         if i in (3, 4):
                             submitted = True
                         if i != 2:
                             break
+                print('fuera del loop')
                 if button == None:
                     log.info("Could not complete submission")
                     break
                 elif submitted:
                     log.info("Application Submitted")
+                    break
+                elif how_many_tries==20:
+                    log.info("Too many tries")
                     break
 
             time.sleep(random.uniform(1.5, 2.5))
@@ -504,7 +536,7 @@ class EasyApplyBot:
 if __name__ == '__main__':
 
     parameters={
-                'positions':['Data Scientist', 'Python', 'Ciencia de Datos'],  #analisis de datos
+                'positions':['Data Scientist', 'Python', 'Ciencia de Datos','analisis de datos'],  #analisis de datos
                 'locations':['Argentina'],  #'Remote',
                 'blacklist':['MFA','Market Fusion Analytics']
 
